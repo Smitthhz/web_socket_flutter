@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -9,7 +10,6 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -24,9 +24,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({
-    super.key,
-  });
+  MyHomePage({super.key});
 
   final WebSocketChannel channel =
       IOWebSocketChannel.connect('wss://echo.websocket.org');
@@ -36,8 +34,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  TextEditingController editingController = TextEditingController();
+  final TextEditingController editingController = TextEditingController();
   final List<String> messageList = [];
+  final StreamController<String> _messageStreamController =
+      StreamController<String>();
+
+  @override
+  void initState() {
+    super.initState();
+    // _messageStreamController = StreamController<String>();
+
+    // Listening to WebSocket stream and adding messages to the StreamController
+    widget.channel.stream.listen((message) {
+      _messageStreamController.add(message.toString());
+    });
+  }
 
   void _sendMessage() {
     if (editingController.text.isEmpty) return;
@@ -49,6 +60,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     widget.channel.sink.close();
     editingController.dispose();
+    _messageStreamController.close();
     super.dispose();
   }
 
@@ -79,26 +91,24 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Form(
-              child: TextField(
-                controller: editingController,
-                decoration: const InputDecoration(labelText: 'Send message'),
-              ),
+            TextField(
+              controller: editingController,
+              decoration: const InputDecoration(labelText: 'Send message'),
             ),
-            const SizedBox(
-              height: 24,
-            ),
+            const SizedBox(height: 24),
             Expanded(
-              child: StreamBuilder(
-                stream: widget.channel.stream,
+              child: StreamBuilder<String>(
+                stream: _messageStreamController.stream,
                 builder: (context, snapshot) {
                   if (snapshot.hasData) {
                     messageList.add(snapshot.data.toString());
+                  } else {
+                    messageList.clear();
                   }
                   return getMessageList();
                 },
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -109,6 +119,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
+
 
 
 
